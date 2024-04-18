@@ -2,9 +2,11 @@ package antigravity.service;
 
 import antigravity.domain.entity.Product;
 import antigravity.domain.entity.Promotion;
+import antigravity.domain.entity.PromotionProducts;
 import antigravity.model.request.ProductInfoRequest;
 import antigravity.model.response.ProductAmountResponse;
 import antigravity.repository.ProductRepository;
+import antigravity.repository.PromotionProductsRepository;
 import antigravity.repository.PromotionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,22 +19,27 @@ import java.util.List;
 public class ProductService {
     private final ProductRepository productRepository;
     private final PromotionRepository promotionRepository;
+    private final PromotionProductsRepository promotionProductsRepository;
 
     public ProductAmountResponse getProductAmount(ProductInfoRequest request) {
         System.out.println("상품 가격 추출 로직을 완성 시켜주세요.");
-        Product product = productRepository.getProduct(request.getProductId());
+        Integer requestProductId = request.getProductId();
+        Product product = productRepository.findProductById(requestProductId);
         List<Integer> requestCouponIds = Arrays.stream(request.getCouponIds()).boxed().toList();
-        List<Promotion> promotionList = promotionRepository.getPromotions(requestCouponIds);
+        List<Promotion> promotionList = promotionRepository.findPromotionsByIdIn(requestCouponIds);
+        List<PromotionProducts> promotionProductsList = promotionProductsRepository.findPromotionProductsByProductId(requestProductId);
 
         Integer product_price = product.getPrice();
         Integer discount_price = 0;
         for (Promotion promotion : promotionList) {
-            if (promotion.isApplicable()) {
-                if (requestCouponIds.contains(promotion.getId())) {
-                    discount_price += getPromotionDiscountPrice(product_price, promotion);
-                }
+            if (!checkExistProductPromotion(promotionProductsList, promotion.getId())) {
+                System.out.println("해당하는 쿠폰이 존재하지 않습니다.");
+                continue;
+            }
+            if (promotion.isApplicableDate()) {
+                discount_price += getPromotionDiscountPrice(product_price, promotion);
             } else {
-                System.out.println("쿠폰 적용에 실패 하셨습니다.");
+                System.out.println("쿠폰 적용 기한이 지났습니다.");
             }
         }
 
@@ -49,10 +56,17 @@ public class ProductService {
     }
 
     public Integer getPromotionDiscountPrice(Integer product_price, Promotion promotion) {
-        return promotion.getDiscount_type().getDiscountPrice(product_price, promotion.getDiscount_value());
+        return promotion.getDiscountType().getDiscountPrice(product_price, promotion.getDiscountValue());
     }
 
     public Integer toDiscardLessThan1000(Integer final_price) {
         return (int) (Math.floor(final_price.doubleValue() / 1000) * 1000);
+    }
+
+    public Boolean checkExistProductPromotion(List<PromotionProducts> promotionProductsList, Integer promotionId) {
+        List<Integer> promotionIdList = promotionProductsList.stream()
+                .map(PromotionProducts::getPromotionId)
+                .toList();
+        return promotionIdList.contains(promotionId);
     }
 }
