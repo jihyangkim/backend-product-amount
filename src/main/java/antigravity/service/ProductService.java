@@ -3,6 +3,7 @@ package antigravity.service;
 import antigravity.domain.entity.Product;
 import antigravity.domain.entity.Promotion;
 import antigravity.domain.entity.PromotionProducts;
+import antigravity.exception.ValidException;
 import antigravity.model.request.ProductInfoRequest;
 import antigravity.model.response.ProductAmountResponse;
 import antigravity.repository.ProductRepository;
@@ -60,7 +61,12 @@ public class ProductService {
     }
 
     public Integer toDiscardLessThan1000(Integer final_price) {
-        return (int) (Math.floor(final_price.doubleValue() / 1000) * 1000);
+        try {
+            checkValidPrice(final_price);
+            return (int) (Math.floor(final_price.doubleValue() / 1000) * 1000);
+        } catch (ValidException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public Boolean checkExistProductPromotion(List<PromotionProducts> promotionProductsList, Integer promotionId) {
@@ -68,5 +74,13 @@ public class ProductService {
                 .map(PromotionProducts::getPromotionId)
                 .toList();
         return promotionIdList.contains(promotionId);
+    }
+
+    static void checkValidPrice(Integer price) throws ValidException {
+        if (price < 10000) {
+            throw new ValidException("최소 상품가격은 ₩10,000 입니다.");
+        } else if (price > 10000000) {
+            throw new ValidException("최대 상품가격은 ₩10,000,000 입니다.");
+        }
     }
 }
